@@ -1,12 +1,34 @@
+#!/usr/bin/env python2.7
 from numpy import random, dot, array, ones, exp
+from argparse import ArgumentParser
+import os
 
+parser = ArgumentParser(description='assignment3')
+parser.add_argument('--show-gnuplot-cmd',
+                    action='store_true',
+                    dest='show_gnuplot_cmd',
+                    default=False,
+                    help='Show run command for gnuplot'
+                    )
+
+parser.add_argument('--test-steps',
+                    type=int,
+                    default=10001,
+                    dest='test_steps',
+                    help='Number of steps for learning process',
+                    )
+
+result_file = 'learning.curve'
 training_file = 'training0.dat'
+test_file = 'test.dat'
 max_weight = 2
-min_weight = 2
+min_weight = -2
+current_dir = os.path.dirname(os.path.abspath(__file__))
+result_file_full_path = '/'.join([current_dir, result_file])
 
 
 # 19:30
-def get_training_data(training_file):
+def get_matrixes_from_file(training_file):
     """
     :param training_file: file with training data
     :return: list with X and Y
@@ -17,12 +39,15 @@ def get_training_data(training_file):
         lines = [l for l in lines if not l.startswith('#')]
     X = [[float(k) for k in l.split('  ')[:1][0].split()] for l in lines]
     Y = [[float(k) for k in l.split('  ')[1:][0].split()] for l in lines]
-    return array(X), array(Y)
+    return  add_bayes_column(array(X)), array(Y)
 
 
 def generate_weights(size, min_border=min_weight, max_border=max_weight):
     return random.uniform(min_border, max_border, size)
 
+def print_weights(weights):
+    for i, w in enumerate(weights):
+        print('w%s=\n%s\n' % (i, w))
 
 def add_bayes_column(z):
     """
@@ -34,8 +59,11 @@ def add_bayes_column(z):
     return m
 
 
-def transfer_fn(x, derivative=False):
-    return x*(1-x) if derivative else 1/(1+exp(-x))
+def transfer_fn(x, fn='logistic', derivative=False):
+    if fn == 'logistic':
+        return x*(1-x) if derivative else 1/(1+exp(-x))
+    if fn == 'tanh':
+        return 1 - x*x if derivative else (exp(x)-exp(-x)) / (exp(x)+exp(-x))
 
 
 # number of layers in network
@@ -45,8 +73,11 @@ h = 3
 # number of neurons in the next hidden layer
 k = 2
 # X = PxN; Y=PxM
-X, Y = get_training_data(training_file)
-X = add_bayes_column(X)
+X, Y = get_matrixes_from_file(training_file)
+# number of outputs
+m = Y.shape[1]
+# number of examples
+p = X.shape[0]
 
 random.seed(100)
 # N+1xH+1
@@ -60,15 +91,34 @@ eta1 = 2.5
 eta2 = 2.6
 eta3 = 2.7
 
+#TODO: add identity transfer funcion
+# add readme file
+def make_test(w1, w2, w3, input_file=test_file):
+    print('Test trained network.')
+    X, Y = get_matrixes_from_file(input_file)
+    print('Input X=\n%s' % X)
+    print('Output Y=\n%s' % Y)
+    # Px(H+1) = (PxN+1)*(N+1xH+1)
+    out1 = transfer_fn(dot(X, w1), fn='tanh')
+    # Px(K+1) = (Px(H+1))*((H+1)x(K+1))
+    out2 = transfer_fn(dot(out1, w2), fn='logistic')
+    # PxM = (Px(K+1))*((K+1)xM)
+    out3 = transfer_fn(dot(out2, w3), fn='logistic')
+    error = Y - out3
+    print('Error=\n%s' % error.T)
 
-def calc(w1, w2, w3):
-    for i in xrange(100001):
+
+def calc(w1, w2, w3, test_steps, show_gnuplot_cmd=False):
+    # clean results file
+    with open(result_file, 'w') as f:
+        f.write('')
+    for i in xrange(test_steps):
         # Px(H+1) = (PxN+1)*(N+1xH+1)
-        out1 = transfer_fn(dot(X, w1))
+        out1 = transfer_fn(dot(X, w1), fn='tanh')
         # Px(K+1) = (Px(H+1))*((H+1)x(K+1))
-        out2 = transfer_fn(dot(out1, w2))
+        out2 = transfer_fn(dot(out1, w2), fn='logistic')
         # PxM = (Px(K+1))*((K+1)xM)
-        out3 = transfer_fn(dot(out2, w3))
+        out3 = transfer_fn(dot(out2, w3), fn='logistic')
         error = Y - out3
         # PxM
         delta3 = error*transfer_fn(out3, derivative=True)
@@ -82,14 +132,38 @@ def calc(w1, w2, w3):
         w2 += eta2*dot(out1.T, delta2)
         # (K+1)xM = (K+1)xP * PxM
         w3 += eta3*dot(out2.T, delta3)
-        if i % 1000 == 0:
-            print(error.T)
+        with open(result_file, 'a') as f:
+            common_error_str = ''
+            for j in xrange(m):
+                common_error_str += ' '.join([str(e) for e in error.T[j]])
+            f.write("%s %s\n" % (i, common_error_str))
+    print('gnuplot command to draw errors:')
+    if show_gnuplot_cmd:
+        plotter_str = '"%s" using 1:%s title \'M=%s; P=%s\', \\\n'
+        plotter_cmd_list = []
+        for i in xrange(m):
+            plotter_cmd_list.append('plot ')
+            for k in xrange(2+i*p, p*(i+1)+2):
+                # from second column till p+2
+                plotter_cmd_list.append(plotter_str % (result_file_full_path,
+                                                       k, i+1, k-1-i*p))
+
+        print(''.join(plotter_cmd_list))
+    return w1, w2, w3
 
 
 if __name__ == '__main__':
-    calc(w1, w2, w3)
-
-
-
-
+    args = parser.parse_args()
+    test_steps = args.test_steps
+    show_gnuplot_cmd = args.show_gnuplot_cmd
+    print('network=N-H-K-M')
+    print('N=%s\nH=%s\nK=%s\nM=%s' % (X.shape[1]-1, h, k, m))
+    for i, eta in enumerate([eta1, eta2, eta3]):
+        print('eta%s=%s' % (i, eta))
+    print('Initial weights: ')
+    print_weights([w1, w2, w3])
+    w1, w2, w3 = calc(w1, w2, w3, test_steps, show_gnuplot_cmd)
+    print('Trained weights: ')
+    print_weights([w1, w2, w3])
+    make_test(w1, w2, w3, test_file)
 
