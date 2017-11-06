@@ -74,6 +74,12 @@ def add_bayes_column(z):
 
 
 def transfer_fn(x, fn='logistic', derivative=False):
+    """
+    :param x: matrix
+    :param fn: type of returned transfer function
+    :param derivative: return a derivative
+    :return: transfer function results
+    """
     if fn == 'logistic':
         return x*(1-x) if derivative else 1/(1+exp(-x))
     if fn == 'tanh':
@@ -135,11 +141,13 @@ def calc(w1, w2, w3, test_steps, show_gnuplot_cmd=False):
         out3 = transfer_fn(dot(out2, w3), fn='logistic')
         error = Y - out3
         # PxM
-        delta3 = error*transfer_fn(out3, derivative=True)
+        delta3 = error*transfer_fn(out3, fn='logistic', derivative=True)
         # Px(K+1) = PxM * Mx(K+1)
-        delta2 = dot(delta3, w3.T)*transfer_fn(out2, derivative=True)
+        delta2 = dot(delta3, w3.T)*transfer_fn(out2,
+                                               fn='logistic',
+                                               derivative=True)
         # Px(H+1) = Px(K+1) * (K+1)x(H+1)
-        delta1 = dot(delta2, w2.T)*transfer_fn(out1, derivative=True)
+        delta1 = dot(delta2, w2.T)*transfer_fn(out1, fn='tanh', derivative=True)
         # (N+1)x(H+1) = (N+1)xP * Px(H+1)
         w1 += eta1*dot(X.T, delta1)
         # (H+1)x(K+1) = (H+1)xP * Px(K+1)
