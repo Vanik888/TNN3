@@ -43,9 +43,20 @@ def get_matrixes_from_file(training_file):
 
 
 def generate_weights(size, min_border=min_weight, max_border=max_weight):
+    """
+    :param size: matrix size
+    :param min_border:  min weight value
+    :param max_border: max weight value
+    :return: matrix of weights
+    """
     return random.uniform(min_border, max_border, size)
 
+
 def print_weights(weights):
+    """
+    :param weights: matrix of weights
+    :return: None
+    """
     for i, w in enumerate(weights):
         print('w%s=\n%s\n' % (i, w))
 
