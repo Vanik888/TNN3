@@ -1,4 +1,5 @@
 #!/usr/bin/env python2.7
+
 from numpy import random, dot, array, ones, exp
 from argparse import ArgumentParser
 import os
@@ -27,7 +28,6 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 result_file_full_path = '/'.join([current_dir, result_file])
 
 
-# 19:30
 def get_matrixes_from_file(training_file):
     """
     :param training_file: file with training data
@@ -36,10 +36,12 @@ def get_matrixes_from_file(training_file):
     lines = []
     with open(training_file, 'r') as f:
         lines = f.readlines()
-        lines = [l for l in lines if not l.startswith('#')]
-    X = [[float(k) for k in l.split('  ')[:1][0].split()] for l in lines]
-    Y = [[float(k) for k in l.split('  ')[1:][0].split()] for l in lines]
-    return  add_bayes_column(array(X)), array(Y)
+        lines = [l for l in lines if not l.startswith('#') and not
+        l.startswith(' ')]
+    split_var = '    ' if '    ' in lines[0] else '  '
+    X = [[float(k) for k in l.split(split_var)[:1][0].split()] for l in lines]
+    Y = [[float(k) for k in l.split(split_var)[1:][0].split()] for l in lines]
+    return add_bayes_column(array(X)), array(Y)
 
 
 def generate_weights(size, min_border=min_weight, max_border=max_weight):
@@ -59,6 +61,7 @@ def print_weights(weights):
     """
     for i, w in enumerate(weights):
         print('w%s=\n%s\n' % (i, w))
+
 
 def add_bayes_column(z):
     """
