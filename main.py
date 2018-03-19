@@ -1,8 +1,8 @@
 #!/usr/bin/env python2.7
 
-from numpy import random, dot, array, ones, exp
-from argparse import ArgumentParser
+import numpy as np
 import os
+from argparse import ArgumentParser
 
 parser = ArgumentParser(description='assignment3')
 parser.add_argument('--show-gnuplot-cmd',
@@ -20,7 +20,7 @@ parser.add_argument('--test-steps',
                     )
 
 result_file = 'learning.curve'
-training_file = 'training0.dat'
+training_file = 'training.dat'
 test_file = 'test.dat'
 max_weight = 2
 min_weight = -2
@@ -41,7 +41,7 @@ def get_matrixes_from_file(training_file):
     split_var = '    ' if '    ' in lines[0] else '  '
     X = [[float(k) for k in l.split(split_var)[:1][0].split()] for l in lines]
     Y = [[float(k) for k in l.split(split_var)[1:][0].split()] for l in lines]
-    return add_bayes_column(array(X)), array(Y)
+    return add_bayes_column(np.array(X)), np.array(Y)
 
 
 def generate_weights(size, min_border=min_weight, max_border=max_weight):
@@ -51,7 +51,7 @@ def generate_weights(size, min_border=min_weight, max_border=max_weight):
     :param max_border: max weight value
     :return: matrix of weights
     """
-    return random.uniform(min_border, max_border, size)
+    return np.random.uniform(min_border, max_border, size)
 
 
 def print_weights(weights):
@@ -68,7 +68,7 @@ def add_bayes_column(z):
     :param z: initial matrix without bias column
     :return: matrix z with bias as a first column
     """
-    m = ones((z.shape[0], z.shape[1]+1))
+    m = np.ones((z.shape[0], z.shape[1]+1))
     m[:, 1:] = z
     return m
 
@@ -81,9 +81,9 @@ def transfer_fn(x, fn='logistic', derivative=False):
     :return: transfer function results
     """
     if fn == 'logistic':
-        return x*(1-x) if derivative else 1/(1+exp(-x))
+        return x*(1-x) if derivative else 1/(1+np.exp(-x))
     if fn == 'tanh':
-        return 1 - x*x if derivative else (exp(x)-exp(-x)) / (exp(x)+exp(-x))
+        return 1 - x*x if derivative else (np.exp(x)-np.exp(-x)) / (np.exp(x)+np.exp(-x))
 
 
 # number of layers in network
@@ -99,7 +99,7 @@ m = Y.shape[1]
 # number of examples
 p = X.shape[0]
 
-random.seed(100)
+np.random.seed(100)
 # N+1xH+1
 w1 = generate_weights((X.shape[1], h+1))
 # H+1xK+1
@@ -119,11 +119,11 @@ def make_test(w1, w2, w3, input_file=test_file):
     print('Input X=\n%s' % X)
     print('Output Y=\n%s' % Y)
     # Px(H+1) = (PxN+1)*(N+1xH+1)
-    out1 = transfer_fn(dot(X, w1), fn='tanh')
+    out1 = transfer_fn(np.dot(X, w1), fn='tanh')
     # Px(K+1) = (Px(H+1))*((H+1)x(K+1))
-    out2 = transfer_fn(dot(out1, w2), fn='logistic')
+    out2 = transfer_fn(np.dot(out1, w2), fn='logistic')
     # PxM = (Px(K+1))*((K+1)xM)
-    out3 = transfer_fn(dot(out2, w3), fn='logistic')
+    out3 = transfer_fn(np.dot(out2, w3), fn='logistic')
     error = Y - out3
     print('Error=\n%s' % error.T)
 
@@ -134,26 +134,28 @@ def calc(w1, w2, w3, test_steps, show_gnuplot_cmd=False):
         f.write('')
     for i in xrange(test_steps):
         # Px(H+1) = (PxN+1)*(N+1xH+1)
-        out1 = transfer_fn(dot(X, w1), fn='tanh')
+        out1 = transfer_fn(np.dot(X, w1), fn='tanh')
         # Px(K+1) = (Px(H+1))*((H+1)x(K+1))
-        out2 = transfer_fn(dot(out1, w2), fn='logistic')
+        out2 = transfer_fn(np.dot(out1, w2), fn='logistic')
         # PxM = (Px(K+1))*((K+1)xM)
-        out3 = transfer_fn(dot(out2, w3), fn='logistic')
+        out3 = transfer_fn(np.dot(out2, w3), fn='logistic')
         error = Y - out3
         # PxM
         delta3 = error*transfer_fn(out3, fn='logistic', derivative=True)
         # Px(K+1) = PxM * Mx(K+1)
-        delta2 = dot(delta3, w3.T)*transfer_fn(out2,
-                                               fn='logistic',
-                                               derivative=True)
+        delta2 = np.dot(delta3, w3.T)*transfer_fn(out2,
+                                                  fn='logistic',
+                                                  derivative=True)
         # Px(H+1) = Px(K+1) * (K+1)x(H+1)
-        delta1 = dot(delta2, w2.T)*transfer_fn(out1, fn='tanh', derivative=True)
+        delta1 = np.dot(delta2, w2.T) * transfer_fn(out1,
+                                                    fn='tanh',
+                                                    derivative=True)
         # (N+1)x(H+1) = (N+1)xP * Px(H+1)
-        w1 += eta1*dot(X.T, delta1)
+        w1 += eta1*np.dot(X.T, delta1)
         # (H+1)x(K+1) = (H+1)xP * Px(K+1)
-        w2 += eta2*dot(out1.T, delta2)
+        w2 += eta2*np.dot(out1.T, delta2)
         # (K+1)xM = (K+1)xP * PxM
-        w3 += eta3*dot(out2.T, delta3)
+        w3 += eta3*np.dot(out2.T, delta3)
         with open(result_file, 'a') as f:
             common_error_str = ''
             for j in xrange(m):
